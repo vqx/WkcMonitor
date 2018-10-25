@@ -39,64 +39,64 @@ s=i(t),a=[[s.min,e-n/2],[s.min,e+n/2],[s.min,e],[s.min1,e],[s.min1,e-n/2],[s.min
   <body>
     <div id="c1"></div>
     <script>
- 	var data = [];
-      var chart = new G2.Chart({
-        id: 'c1',
-        forceFit: true,
-        height: 1000
-      });
-      chart.source(data, {
-        time: {
-          alias: '时间',
-          type: 'time',
-          mask: 'HH:MM',
-          tickCount:100,
-          nice: true
-        },
-        price: {
-          alias: '价格',
-          min: 0.5,
-          max: 1.2
-        },
-        type:{
-          type:'cat'
+        var data = [];
+          var chart = new G2.Chart({
+            id: 'c1',
+            forceFit: true,
+            height: 1000
+          });
+          chart.source(data, {
+            time: {
+              alias: '时间',
+              type: 'time',
+              mask: 'HH:MM',
+              tickCount:100,
+              nice: true
+            },
+            price: {
+              alias: '价格',
+              min: 0.5,
+              max: 1.2
+            },
+            type:{
+              type:'cat'
+            }
+          });
+            chart.line().position('time*price').color('type',['#ff7f0e','#2ca02c']).shape('smooth').size(2);
+            chart.render();
+        var updateUi = function(){
+            chart.changeData(data);
         }
-      });
-      	chart.line().position('time*price').color('type',['#ff7f0e','#2ca02c']).shape('smooth').size(2);
-      	chart.render();
-	var updateUi = function(){
-		chart.changeData(data);
-	}
-	var addOneData = function(t,p){
-			if(data.length >= 1000) {
-          			data.shift();
-              		}
-			data.push({time: t, price: p, type: '广告收价格'});
-	}
-	var initData = function(){
-		$.get("http://127.0.0.1:3333/hirstory", function(result){
-			for(var i = result.length -1001 ; i < result.length; i++){
-				var tmp = result[i]
-				addOneData(tmp.Time, tmp.Price)
-			}
-			console.log(new Date(result[result.length-1].Time).getTime())
-			updateUi();
-      		});
-	}
-	var updateData = function(){
-		$.get("http://127.0.0.1:3333/getLastData", function(result){
-			console.log(result)
-			if(data[data.length - 1].time == result.Time){
-				return ;
-			}
-			addOneData(result.Time,result.Price)
-			updateUi();
-      		});
-	}	
-	initData();
-      	var tmp = setInterval(function(){
-		updateData();
-      	},30000); 
+        var addOneData = function(t,p){
+                if(data.length >= 1000) {
+                        data.shift();
+                        }
+                data.push({time: t, price: p, type: '广告收价格'});
+        }
+        var initData = function(){
+            $.get("http://127.0.0.1:3333/hirstory", function(result){
+                for(var i = result.length -1001 ; i < result.length; i++){
+                    var tmp = result[i]
+                    addOneData(tmp.Time, tmp.Price)
+                }
+                console.log(new Date(result[result.length-1].Time).getTime())
+                updateUi();
+                });
+        }
+        var updateData = function(){
+            $.get("http://127.0.0.1:3333/getLastData", function(result){
+                console.log(result)
+                if(data[data.length - 1].time == result.Time){
+                    return ;
+                }
+                addOneData(result.Time,result.Price)
+                updateUi();
+                });
+        }
+        initData();
+            var tmp = setInterval(function(){
+            updateData();
+            },30000);
          </script>
   </body>
 </html>
