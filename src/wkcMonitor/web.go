@@ -12,8 +12,14 @@ import (
 	"encoding/json"
 )
 
+type ResultItem struct {
+	Time  string
+	Price float64
+}
+
 func WebRun() {
 	http.HandleFunc("/hirstory", History)
+	http.HandleFunc("/getLastData", GetLastData)
 	http.HandleFunc("/setExpectPrice", SetExpectPrice)
 	go collectHistoryThread()
 	err := http.ListenAndServe(":3333", nil)
@@ -69,7 +75,35 @@ func History(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 	data := GetData(startTime, endTime)
+	w.Header().Set("Access-Control-Allow-Origin", "*")
+	w.Header().Add("Access-Control-Allow-Headers", "Content-Type")
+	w.Header().Set("content-type", "application/json")
 	w.Write(data)
+}
+
+func GetLastData(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Access-Control-Allow-Origin", "*")
+	w.Header().Add("Access-Control-Allow-Headers", "Content-Type")
+	w.Header().Set("content-type", "application/json")
+	row := dbObj.QueryRow("select * from History order by id DESC limit 1")
+	if row == nil {
+		fmt.Println("e7rdxz22br row == nil")
+		w.Write([]byte("e7rdxz22br nodata"))
+		return
+	}
+	var id string
+	var price float64
+	row.Scan(&id, &price)
+	byteSlice, err := json.Marshal(ResultItem{
+		Time:id,
+		Price:price,
+	})
+	if err != nil {
+		fmt.Println("bb8b46z2mt json.Marshal error, ", err.Error())
+		w.Write([]byte("bb8b46z2mt json.Marshal error"))
+		return
+	}
+	w.Write(byteSlice)
 }
 
 func GetData(startTime time.Time, endTime time.Time) []byte {
@@ -78,17 +112,13 @@ func GetData(startTime time.Time, endTime time.Time) []byte {
 		fmt.Println("wysujxdywu", err)
 		return []byte{}
 	}
-	type tmp struct {
-		Time  string
-		Price float64
-	}
-	result := []tmp{}
+	result := []ResultItem{}
 	for rows.Next() {
 		var id string
 		var price float64
 		rows.Scan(&id, &price)
 		if price != 0 {
-			result = append(result, tmp{id, price})
+			result = append(result, ResultItem{id, price})
 		}
 	}
 	r, err := json.Marshal(result)
@@ -101,7 +131,7 @@ func GetData(startTime time.Time, endTime time.Time) []byte {
 
 const (
 	DefaultMail = "xpoony@163.com"
-	AuthCode = "00000000000000"
+	AuthCode = "******************"
 	Host = "smtp.163.com:25"
 )
 

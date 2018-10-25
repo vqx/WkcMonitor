@@ -58,7 +58,7 @@ func init() {
 	dbOnce.Do(func() {
 		var err error
 		//dbObj, err = sql.Open("mysql", "root:@/WKC?charset=utf8")
-		dbObj, err = sql.Open("mysql", "root:00000000000@/WKC?charset=utf8")
+		dbObj, err = sql.Open("mysql", "root:***********@/WKC?charset=utf8")
 		if err != nil {
 			fmt.Println("swjcwkwmka", err)
 			return
