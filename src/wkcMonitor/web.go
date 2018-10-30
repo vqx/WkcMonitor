@@ -12,15 +12,25 @@ import (
 	"encoding/json"
 )
 
-type ResultItem struct {
-	Time  string
-	Price float64
+type WebContext struct {
+	ExpectBuyPrice     float64
+	ExpectSellPrice    float64
+	MysqlPwd           string
+	EmailCode          string
+	IsMonitorBuyPrice  bool
+	IsMonitorSellPrice bool
+	lock               sync.Mutex
 }
 
-func WebRun() {
-	http.HandleFunc("/hirstory", History)
+var webContext *WebContext
+
+func WebRun(web *WebContext) {
+	webContext = web
+	initAll()
+	http.HandleFunc("/history", History)
 	http.HandleFunc("/getLastData", GetLastData)
-	http.HandleFunc("/setExpectPrice", SetExpectPrice)
+	http.HandleFunc("/setExpectBuyPrice", SetExpectBuyPrice)
+	http.HandleFunc("/setExpectSellPrice", SetExpectSellPrice)
 	go collectHistoryThread()
 	err := http.ListenAndServe(":3333", nil)
 	if err != nil {
@@ -29,18 +39,41 @@ func WebRun() {
 	SendEmail("wkc web stoped", "wkc web stoped", "727998535@qq.com")
 }
 
-var expectPrice float64
-var priceLock sync.Mutex
-
-func insertExpectPrice(price float64) {
-	_, err := dbObj.Exec("Insert into ExpectPrice(`Id`,`Price`) VALUES(?,?)", "now", price)
+func insertExpectPrice(id string, price float64) {
+	_, err := dbObj.Exec("REPLACE into ExpectPrice(`Id`,`Price`) VALUES(?, " + strconv.FormatFloat(price, 'f', 3, 64) + ")", id)
 	if err != nil {
 		fmt.Println("wamg73wv72", err.Error())
 		return
 	}
 }
 
-func SetExpectPrice(w http.ResponseWriter, r *http.Request) {
+func getExpectPrice(id string) float64 {
+	r := dbObj.QueryRow("select * from ExpectPrice where `Id` = ?", id)
+	if r != nil {
+		var id1 string
+		var price float64
+		r.Scan(&id1, &price)
+		return price
+	}
+	return 0
+}
+
+func initExpectPrice() {
+	webContext.lock.Lock()
+	webContext.ExpectBuyPrice = getExpectPrice("buy")
+	webContext.ExpectSellPrice = getExpectPrice("sell")
+	if webContext.ExpectBuyPrice == 0 {
+		webContext.ExpectBuyPrice = 1
+		insertExpectPrice("buy", 1.1)
+	}
+	if webContext.ExpectSellPrice == 0 {
+		webContext.ExpectSellPrice = 1
+		insertExpectPrice("sell", 1.1)
+	}
+	webContext.lock.Unlock()
+}
+
+func SetExpectBuyPrice(w http.ResponseWriter, r *http.Request) {
 	r.ParseForm()  //解析参数，默认是不会解析的
 	price := r.Form.Get("price")
 	tmp, err := strconv.ParseFloat(price, 10)
@@ -49,10 +82,26 @@ func SetExpectPrice(w http.ResponseWriter, r *http.Request) {
 		w.Write([]byte("324trdmraj " + err.Error()))
 		return
 	}
-	priceLock.Lock()
-	expectPrice = tmp
-	priceLock.Unlock()
-	insertExpectPrice(tmp)
+	webContext.lock.Lock()
+	webContext.ExpectBuyPrice = tmp
+	webContext.lock.Unlock()
+	insertExpectPrice("buy", tmp)
+	w.Write([]byte("h2z5qj4pcd success"))
+}
+
+func SetExpectSellPrice(w http.ResponseWriter, r *http.Request) {
+	r.ParseForm()  //解析参数，默认是不会解析的
+	price := r.Form.Get("price")
+	tmp, err := strconv.ParseFloat(price, 10)
+	if err != nil {
+		fmt.Println("324trdmraj ", err.Error())
+		w.Write([]byte("324trdmraj " + err.Error()))
+		return
+	}
+	webContext.lock.Lock()
+	webContext.ExpectSellPrice = tmp
+	webContext.lock.Unlock()
+	insertExpectPrice("sell", tmp)
 	w.Write([]byte("h2z5qj4pcd success"))
 }
 
@@ -92,12 +141,10 @@ func GetLastData(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	var id string
-	var price float64
-	row.Scan(&id, &price)
-	byteSlice, err := json.Marshal(ResultItem{
-		Time:id,
-		Price:price,
-	})
+	var sellPrice float64
+	var buyPrice float64
+	row.Scan(&id, &sellPrice, buyPrice)
+	byteSlice, err := json.Marshal(ResultItem{id, buyPrice, sellPrice})
 	if err != nil {
 		fmt.Println("bb8b46z2mt json.Marshal error, ", err.Error())
 		w.Write([]byte("bb8b46z2mt json.Marshal error"))
@@ -115,10 +162,11 @@ func GetData(startTime time.Time, endTime time.Time) []byte {
 	result := []ResultItem{}
 	for rows.Next() {
 		var id string
-		var price float64
-		rows.Scan(&id, &price)
-		if price != 0 {
-			result = append(result, ResultItem{id, price})
+		var sellPrice float64
+		var buyPrice float64
+		rows.Scan(&id, &sellPrice, buyPrice)
+		if sellPrice != 0 && buyPrice != 0 {
+			result = append(result, ResultItem{id, buyPrice, sellPrice})
 		}
 	}
 	r, err := json.Marshal(result)
@@ -131,16 +179,44 @@ func GetData(startTime time.Time, endTime time.Time) []byte {
 
 const (
 	DefaultMail = "xpoony@163.com"
-	AuthCode = "******************"
 	Host = "smtp.163.com:25"
 )
 
 func SendEmail(title string, content string, to string) {
-	auth := smtp.PlainAuth("", DefaultMail, AuthCode, strings.Split(Host, ":")[0])
-	msg := []byte("To: " + to + "\r\nFrom: " + AuthCode + "<" + AuthCode + ">\r\nSubject: " + title + "\r\nContent-Type: text/plain; charset=UTF-8\r\n\r\n" + content)
-	send_to := strings.Split(to, ";")
-	err := smtp.SendMail(Host, auth, DefaultMail, send_to, msg)
+	body := `
+    <html>
+    <body>
+    <pre>
+    ` + content + `
+    </pre>
+    </body>
+    </html>
+    `
+	//执行逻辑函数
+	err := sendMail(DefaultMail, webContext.EmailCode, Host, to, title, body, "html")
 	if err != nil {
-		fmt.Println("rbxerx2hv4 " + err.Error())
+		fmt.Println("发送邮件失败!")
+		fmt.Println(err)
+	} else {
+		fmt.Println("发送邮件成功!")
 	}
 }
+
+
+//发送邮件的逻辑函数
+func sendMail(user, password, host, to, subject, body, mailtype string) error {
+	hp := strings.Split(host, ":")
+	auth := smtp.PlainAuth("", user, password, hp[0])
+	var content_type string
+	if mailtype == "html" {
+		content_type = "Content-Type: text/" + mailtype + "; charset=UTF-8"
+	} else {
+		content_type = "Content-Type: text/plain" + "; charset=UTF-8"
+	}
+
+	msg := []byte("To: " + to + "\r\nFrom: " + user + "<" + user + ">\r\nSubject: " + subject + "\r\n" + content_type + "\r\n\r\n" + body)
+	send_to := strings.Split(to, ";")
+	err := smtp.SendMail(host, auth, user, send_to, msg)
+	return err
+}
+

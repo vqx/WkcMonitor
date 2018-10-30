@@ -14,8 +14,39 @@ import (
 
 var client *http.Client
 
+const TimeFormat = "2006-01-02 15:04:05"
+
+type ResultItem struct {
+	Time      string
+	BuyPrice  float64
+	SellPrice float64
+}
+
+func (ri *ResultItem) SaveToDb() {
+	_, err := dbObj.Exec("Insert into History(`Id`,`SellPrice`,`BuyPrice`) VALUES(?,?,?)", ri.Time, ri.SellPrice, ri.BuyPrice)
+	if err != nil {
+		fmt.Println("7m28fkvnes ", err)
+		return
+	}
+	fmt.Println("save  price item", ri.Time, " buy: ", ri.BuyPrice, " sell: ", ri.SellPrice)
+}
+
+func (ri *ResultItem) CheckEmail() {
+	if webContext.IsMonitorSellPrice {
+		if webContext.ExpectSellPrice != 0 && ri.SellPrice >= webContext.ExpectSellPrice {
+			SendEmail("ad sell wkc price was good", "ad sell wkc price was good" + strconv.FormatFloat(ri.SellPrice, 'f', 3, 64), "727998535@qq.com")
+		}
+	}
+	if webContext.IsMonitorBuyPrice {
+		if webContext.ExpectBuyPrice != 0 && ri.BuyPrice >= webContext.ExpectBuyPrice {
+			SendEmail("ad buy wkc price was good", "ad buy wkc price was good" + strconv.FormatFloat(ri.SellPrice, 'f', 3, 64), "727998535@qq.com")
+		}
+	}
+}
+
 func GetRequest() *http.Request {
-	req, err := http.NewRequest(http.MethodGet, "https://wss.playwkc.com/sell/WKC", nil)
+	url := "https://wss.playwkc.com"
+	req, err := http.NewRequest(http.MethodGet, url, nil)
 	if err != nil {
 		fmt.Println("h2aau5jxw9")
 		return nil
@@ -24,6 +55,7 @@ func GetRequest() *http.Request {
 }
 
 func GetResponse(req *http.Request) *http.Response {
+	client = &http.Client{}
 	resp, err := client.Do(req)
 	if err != nil {
 		fmt.Println("ut2cj5wmas")
@@ -32,59 +64,50 @@ func GetResponse(req *http.Request) *http.Response {
 	return resp
 }
 
-func GetPrice(resp *http.Response) float64 {
+func GetPriceItem(resp *http.Response) *ResultItem {
 	body, err := ioutil.ReadAll(resp.Body)
 	if err != nil {
 		fmt.Println("n75u53w2a4")
-		return -1
+		return nil
 	}
 	resp.Body.Close()
 	content := string(body)
-	index := strings.Index(content, "<div class=\"price\">")
-	tmp := content[index + 19:index + 25]
-	tmp = strings.Replace(tmp, " ", "", -1)
-	price, err := strconv.ParseFloat(tmp, 10)
+	tmp := content[strings.Index(content, "Price:") + 7:]
+	buyStr := tmp[:strings.Index(tmp, " ")]
+	tmp1 := tmp[strings.Index(tmp, "Sell Wankecoin"):strings.Index(tmp, "Sell Wankecoin") + 50]
+	tmp2 := tmp1[strings.Index(tmp1, "Price:") + 7:]
+	sellStr := tmp2[:strings.Index(tmp2, " ")]
+	buy, err := strconv.ParseFloat(buyStr, 64)
 	if err != nil {
-		fmt.Println("ebhnr5rmmt")
-		return -1
+		fmt.Println("rchnn9g9pt ParseFloat buy error")
+		return nil
 	}
-	return price
+	sell, err := strconv.ParseFloat(sellStr, 64)
+	if err != nil {
+		fmt.Println("g5f25djf9x ParseFloat sell error")
+		return nil
+	}
+	return &ResultItem{
+		Time:time.Now().Format(TimeFormat),
+		SellPrice:sell,
+		BuyPrice:buy,
+	}
 }
 
 var dbObj *sql.DB
 var dbOnce sync.Once
 
-func init() {
+func initAll() {
 	dbOnce.Do(func() {
 		var err error
-		//dbObj, err = sql.Open("mysql", "root:@/WKC?charset=utf8")
-		dbObj, err = sql.Open("mysql", "root:***********@/WKC?charset=utf8")
+		dbObj, err = sql.Open("mysql", "root:" + webContext.MysqlPwd + "@/WKC?charset=utf8")
 		if err != nil {
 			fmt.Println("swjcwkwmka", err)
 			return
 		}
-		r := dbObj.QueryRow("select * from ExpectPrice where `Id` = 'now'")
-		if r != nil {
-			var id string
-			var price float64
-			r.Scan(&id, &price)
-			priceLock.Lock()
-			expectPrice = price
-			priceLock.Unlock()
-		}
 		client = &http.Client{}
+		initExpectPrice()
 	})
-
-}
-
-func SaveToDb(price float64) {
-	t := time.Now()
-	_, err := dbObj.Exec("Insert into History(`Id`,`Price`) VALUES(?,?)", t.Format("2006-01-02 15:04:05"), price)
-	if err != nil {
-		fmt.Println(err)
-		fmt.Println("7m28fkvnes")
-		return
-	}
 }
 
 func collectHistoryThread() {
@@ -93,27 +116,24 @@ func collectHistoryThread() {
 		time.Sleep(time.Second)
 	}
 	for {
-		fmt.Println("329u5epfxr start one round")
-		req := GetRequest()
-		if req == nil {
-			time.Sleep(time.Second * 30)
-			continue
-		}
-		resp := GetResponse(req)
-		if resp == nil {
-			time.Sleep(time.Second * 30)
-			continue
-		}
-		price := GetPrice(resp)
-		if price == -1 {
-			time.Sleep(time.Second * 30)
-			continue
-		}
-		SaveToDb(price)
-		if price >= expectPrice && expectPrice != 0 {
-			SendEmail("it's time tp sale wkc", "wkc price is good to sale" + strconv.FormatFloat(expectPrice, 'f', 3, 64), "727998535@qq.com")
-		}
-		fmt.Println("329u5epfxr end one round ", price)
+		collectHistory()
 		time.Sleep(time.Second * 30)
 	}
+}
+
+func collectHistory() {
+	req := GetRequest()
+	if req == nil {
+		return
+	}
+	resp := GetResponse(req)
+	if resp == nil {
+		return
+	}
+	priceItem := GetPriceItem(resp)
+	if priceItem == nil {
+		return
+	}
+	priceItem.SaveToDb()
+	priceItem.CheckEmail()
 }
