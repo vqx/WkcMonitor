@@ -143,7 +143,7 @@ func GetLastData(w http.ResponseWriter, r *http.Request) {
 	var id string
 	var sellPrice float64
 	var buyPrice float64
-	row.Scan(&id, &sellPrice, buyPrice)
+	row.Scan(&id, &sellPrice, &buyPrice)
 	byteSlice, err := json.Marshal(ResultItem{id, buyPrice, sellPrice})
 	if err != nil {
 		fmt.Println("bb8b46z2mt json.Marshal error, ", err.Error())
