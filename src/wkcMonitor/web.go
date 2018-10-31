@@ -106,7 +106,7 @@ func SetExpectSellPrice(w http.ResponseWriter, r *http.Request) {
 }
 
 func History(w http.ResponseWriter, r *http.Request) {
-	startTime := time.Date(2018, 10, 23, 0, 0, 0, 0, time.Local)
+	startTime := time.Date(2018, 10, 28, 0, 0, 0, 0, time.Local)
 	endTime := time.Now().In(time.Local)
 	r.ParseForm()  //解析参数，默认是不会解析的
 	startTimeStr := r.Form.Get("startTime")
@@ -164,7 +164,7 @@ func GetData(startTime time.Time, endTime time.Time) []byte {
 		var id string
 		var sellPrice float64
 		var buyPrice float64
-		rows.Scan(&id, &sellPrice, buyPrice)
+		rows.Scan(&id, &sellPrice, &buyPrice)
 		if sellPrice != 0 && buyPrice != 0 {
 			result = append(result, ResultItem{id, buyPrice, sellPrice})
 		}
