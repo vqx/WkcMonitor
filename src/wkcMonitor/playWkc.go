@@ -58,7 +58,7 @@ func GetResponse(req *http.Request) *http.Response {
 	client = &http.Client{}
 	resp, err := client.Do(req)
 	if err != nil {
-		fmt.Println("ut2cj5wmas")
+		fmt.Println("ut2cj5wmas", err)
 		return nil
 	}
 	return resp
