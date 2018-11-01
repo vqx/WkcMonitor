@@ -45,7 +45,7 @@ func (ri *ResultItem) CheckEmail() {
 }
 
 func GetRequest() *http.Request {
-	url := "https://wss.playwkc.com"
+	url := "https://www.playwkc.com"
 	req, err := http.NewRequest(http.MethodGet, url, nil)
 	if err != nil {
 		fmt.Println("h2aau5jxw9")
