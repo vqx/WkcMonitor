@@ -29,7 +29,6 @@ func (ri *ResultItem) SaveToDb() {
 		fmt.Println("7m28fkvnes ", err)
 		return
 	}
-	fmt.Println("save  price item", ri.Time, " buy: ", ri.BuyPrice, " sell: ", ri.SellPrice)
 }
 
 func GetRequest() *http.Request {
