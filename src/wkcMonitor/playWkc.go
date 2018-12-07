@@ -29,6 +29,7 @@ func (ri *ResultItem) SaveToDb() {
 		fmt.Println("7m28fkvnes ", err)
 		return
 	}
+	fmt.Println(ri.Time, "b", ri.BuyPrice, "\ts", ri.SellPrice)
 }
 
 func GetRequest() *http.Request {
@@ -122,8 +123,10 @@ func initAll() {
 }
 
 func collectHistoryThread() {
-	for time.Now().Second() % 30 != 0 {
+	if time.Now().Second() % 30 != 0 {
 		fmt.Println("858quu5hjs wait")
+	}
+	for time.Now().Second() % 30 != 0 {
 		time.Sleep(time.Second)
 	}
 	for {
