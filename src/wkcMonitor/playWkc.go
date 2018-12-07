@@ -10,6 +10,7 @@ import (
 	"database/sql"
 	_ "github.com/go-sql-driver/mysql"
 	"sync"
+	"math/rand"
 )
 
 var client *http.Client
@@ -31,19 +32,6 @@ func (ri *ResultItem) SaveToDb() {
 	fmt.Println("save  price item", ri.Time, " buy: ", ri.BuyPrice, " sell: ", ri.SellPrice)
 }
 
-func (ri *ResultItem) CheckEmail() {
-	if webContext.IsMonitorSellPrice {
-		if webContext.ExpectSellPrice != 0 && ri.SellPrice >= webContext.ExpectSellPrice {
-			SendEmail("ad sell wkc price was good", "ad sell wkc price was good" + strconv.FormatFloat(ri.SellPrice, 'f', 3, 64), "727998535@qq.com")
-		}
-	}
-	if webContext.IsMonitorBuyPrice {
-		if webContext.ExpectBuyPrice != 0 && ri.BuyPrice >= webContext.ExpectBuyPrice {
-			SendEmail("ad buy wkc price was good", "ad buy wkc price was good" + strconv.FormatFloat(ri.SellPrice, 'f', 3, 64), "727998535@qq.com")
-		}
-	}
-}
-
 func GetRequest() *http.Request {
 	url := "https://www.playwkc.com"
 	req, err := http.NewRequest(http.MethodGet, url, nil)
@@ -51,11 +39,32 @@ func GetRequest() *http.Request {
 		fmt.Println("h2aau5jxw9")
 		return nil
 	}
+	userAgentSlice := []string{
+		"Mozilla/5.0 (Windows NT 6.1; WOW64) AppleWebKit/537.1 (KHTML, like Gecko) Chrome/22.0.1207.1 Safari/537.1",
+		"Mozilla/5.0 (X11; CrOS i686 2268.111.0) AppleWebKit/536.11 (KHTML, like Gecko) Chrome/20.0.1132.57 Safari/536.11",
+		"Mozilla/5.0 (Windows NT 6.1; WOW64) AppleWebKit/536.6 (KHTML, like Gecko) Chrome/20.0.1092.0 Safari/536.6",
+		"Mozilla/5.0 (Windows NT 6.2) AppleWebKit/536.6 (KHTML, like Gecko) Chrome/20.0.1090.0 Safari/536.6",
+		"Mozilla/5.0 (Windows NT 6.2; WOW64) AppleWebKit/537.1 (KHTML, like Gecko) Chrome/19.77.34.5 Safari/537.1",
+		"Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/536.5 (KHTML, like Gecko) Chrome/19.0.1084.9 Safari/536.5",
+		"Mozilla/5.0 (Windows NT 6.0) AppleWebKit/536.5 (KHTML, like Gecko) Chrome/19.0.1084.36 Safari/536.5",
+		"Mozilla/5.0 (Windows NT 6.1; WOW64) AppleWebKit/536.3 (KHTML, like Gecko) Chrome/19.0.1063.0 Safari/536.3",
+		"Mozilla/5.0 (Windows NT 5.1) AppleWebKit/536.3 (KHTML, like Gecko) Chrome/19.0.1063.0 Safari/536.3",
+		"Mozilla/5.0 (Macintosh; Intel Mac OS X 10_8_0) AppleWebKit/536.3 (KHTML, like Gecko) Chrome/19.0.1063.0 Safari/536.3",
+		"Mozilla/5.0 (Windows NT 6.2) AppleWebKit/536.3 (KHTML, like Gecko) Chrome/19.0.1062.0 Safari/536.3",
+		"Mozilla/5.0 (Windows NT 6.1; WOW64) AppleWebKit/536.3 (KHTML, like Gecko) Chrome/19.0.1062.0 Safari/536.3",
+		"Mozilla/5.0 (Windows NT 6.2) AppleWebKit/536.3 (KHTML, like Gecko) Chrome/19.0.1061.1 Safari/536.3",
+		"Mozilla/5.0 (Windows NT 6.1; WOW64) AppleWebKit/536.3 (KHTML, like Gecko) Chrome/19.0.1061.1 Safari/536.3",
+		"Mozilla/5.0 (Windows NT 6.1) AppleWebKit/536.3 (KHTML, like Gecko) Chrome/19.0.1061.1 Safari/536.3",
+		"Mozilla/5.0 (Windows NT 6.2) AppleWebKit/536.3 (KHTML, like Gecko) Chrome/19.0.1061.0 Safari/536.3",
+		"Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/535.24 (KHTML, like Gecko) Chrome/19.0.1055.1 Safari/535.24",
+		"Mozilla/5.0 (Windows NT 6.2; WOW64) AppleWebKit/535.24 (KHTML, like Gecko) Chrome/19.0.1055.1 Safari/535.24",
+	}
+	ra := rand.Intn(len(userAgentSlice))
+	req.Header.Set("user-agent", userAgentSlice[ra])
 	return req
 }
 
 func GetResponse(req *http.Request) *http.Response {
-	client = &http.Client{}
 	resp, err := client.Do(req)
 	if err != nil {
 		fmt.Println("ut2cj5wmas", err)
@@ -70,7 +79,7 @@ func GetPriceItem(resp *http.Response) *ResultItem {
 		fmt.Println("n75u53w2a4")
 		return nil
 	}
-	resp.Body.Close()
+	defer resp.Body.Close()
 	content := string(body)
 	tmp := content[strings.Index(content, "Price:") + 7:]
 	buyStr := tmp[:strings.Index(tmp, " ")]
@@ -105,8 +114,11 @@ func initAll() {
 			fmt.Println("swjcwkwmka", err)
 			return
 		}
-		client = &http.Client{}
-		initExpectPrice()
+		client = &http.Client{
+			Transport: &http.Transport{
+				DisableKeepAlives: true,
+			},
+		}
 	})
 }
 
@@ -135,5 +147,4 @@ func collectHistory() {
 		return
 	}
 	priceItem.SaveToDb()
-	priceItem.CheckEmail()
 }

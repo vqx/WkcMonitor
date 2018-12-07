@@ -5,18 +5,12 @@ import (
 	"log"
 	"fmt"
 	"time"
-	"strconv"
 	"sync"
-	"net/smtp"
-	"strings"
 	"encoding/json"
 )
 
 type WebContext struct {
-	ExpectBuyPrice     float64
-	ExpectSellPrice    float64
 	MysqlPwd           string
-	EmailCode          string
 	IsMonitorBuyPrice  bool
 	IsMonitorSellPrice bool
 	lock               sync.Mutex
@@ -29,80 +23,12 @@ func WebRun(web *WebContext) {
 	initAll()
 	http.HandleFunc("/history", History)
 	http.HandleFunc("/getLastData", GetLastData)
-	http.HandleFunc("/setExpectBuyPrice", SetExpectBuyPrice)
-	http.HandleFunc("/setExpectSellPrice", SetExpectSellPrice)
+	http.HandleFunc("/getIsOnline", GetIsOnline)
 	go collectHistoryThread()
 	err := http.ListenAndServe(":3333", nil)
 	if err != nil {
 		log.Fatal("ListenAndServe: ", err)
 	}
-	SendEmail("wkc web stoped", "wkc web stoped", "727998535@qq.com")
-}
-
-func insertExpectPrice(id string, price float64) {
-	_, err := dbObj.Exec("REPLACE into ExpectPrice(`Id`,`Price`) VALUES(?, " + strconv.FormatFloat(price, 'f', 3, 64) + ")", id)
-	if err != nil {
-		fmt.Println("wamg73wv72", err.Error())
-		return
-	}
-}
-
-func getExpectPrice(id string) float64 {
-	r := dbObj.QueryRow("select * from ExpectPrice where `Id` = ?", id)
-	if r != nil {
-		var id1 string
-		var price float64
-		r.Scan(&id1, &price)
-		return price
-	}
-	return 0
-}
-
-func initExpectPrice() {
-	webContext.lock.Lock()
-	webContext.ExpectBuyPrice = getExpectPrice("buy")
-	webContext.ExpectSellPrice = getExpectPrice("sell")
-	if webContext.ExpectBuyPrice == 0 {
-		webContext.ExpectBuyPrice = 1
-		insertExpectPrice("buy", 1.1)
-	}
-	if webContext.ExpectSellPrice == 0 {
-		webContext.ExpectSellPrice = 1
-		insertExpectPrice("sell", 1.1)
-	}
-	webContext.lock.Unlock()
-}
-
-func SetExpectBuyPrice(w http.ResponseWriter, r *http.Request) {
-	r.ParseForm()  //解析参数，默认是不会解析的
-	price := r.Form.Get("price")
-	tmp, err := strconv.ParseFloat(price, 10)
-	if err != nil {
-		fmt.Println("324trdmraj ", err.Error())
-		w.Write([]byte("324trdmraj " + err.Error()))
-		return
-	}
-	webContext.lock.Lock()
-	webContext.ExpectBuyPrice = tmp
-	webContext.lock.Unlock()
-	insertExpectPrice("buy", tmp)
-	w.Write([]byte("h2z5qj4pcd success"))
-}
-
-func SetExpectSellPrice(w http.ResponseWriter, r *http.Request) {
-	r.ParseForm()  //解析参数，默认是不会解析的
-	price := r.Form.Get("price")
-	tmp, err := strconv.ParseFloat(price, 10)
-	if err != nil {
-		fmt.Println("324trdmraj ", err.Error())
-		w.Write([]byte("324trdmraj " + err.Error()))
-		return
-	}
-	webContext.lock.Lock()
-	webContext.ExpectSellPrice = tmp
-	webContext.lock.Unlock()
-	insertExpectPrice("sell", tmp)
-	w.Write([]byte("h2z5qj4pcd success"))
 }
 
 func History(w http.ResponseWriter, r *http.Request) {
@@ -177,46 +103,17 @@ func GetData(startTime time.Time, endTime time.Time) []byte {
 	return r
 }
 
-const (
-	DefaultMail = "xpoony@163.com"
-	Host = "smtp.163.com:25"
-)
-
-func SendEmail(title string, content string, to string) {
-	body := `
-    <html>
-    <body>
-    <pre>
-    ` + content + `
-    </pre>
-    </body>
-    </html>
-    `
-	//执行逻辑函数
-	err := sendMail(DefaultMail, webContext.EmailCode, Host, to, title, body, "html")
-	if err != nil {
-		fmt.Println("发送邮件失败!")
-		fmt.Println(err)
-	} else {
-		fmt.Println("发送邮件成功!")
-	}
+func GetIsOnline(w http.ResponseWriter, r *http.Request){
+	w.Header().Set("Access-Control-Allow-Origin", "*")
+	w.Header().Add("Access-Control-Allow-Headers", "Content-Type")
+	w.Header().Set("content-type", "application/json")
+	w.Write([]byte("true"))
 }
 
-
-//发送邮件的逻辑函数
-func sendMail(user, password, host, to, subject, body, mailtype string) error {
-	hp := strings.Split(host, ":")
-	auth := smtp.PlainAuth("", user, password, hp[0])
-	var content_type string
-	if mailtype == "html" {
-		content_type = "Content-Type: text/" + mailtype + "; charset=UTF-8"
-	} else {
-		content_type = "Content-Type: text/plain" + "; charset=UTF-8"
-	}
-
-	msg := []byte("To: " + to + "\r\nFrom: " + user + "<" + user + ">\r\nSubject: " + subject + "\r\n" + content_type + "\r\n\r\n" + body)
-	send_to := strings.Split(to, ";")
-	err := smtp.SendMail(host, auth, user, send_to, msg)
-	return err
+/*
+func GetDataGroup(w http.ResponseWriter, r *http.Request){
+	w.Header().Set("Access-Control-Allow-Origin", "*")
+	w.Header().Add("Access-Control-Allow-Headers", "Content-Type")
+	w.Header().Set("content-type", "application/json")
 }
-
+*/
