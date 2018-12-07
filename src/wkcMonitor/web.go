@@ -24,7 +24,9 @@ func WebRun(web *WebContext) {
 	http.HandleFunc("/history", History)
 	http.HandleFunc("/getLastData", GetLastData)
 	http.HandleFunc("/getIsOnline", GetIsOnline)
-	go collectHistoryThread()
+	http.HandleFunc("/getDataGroup", GetDataGroup)
+	//go collectHistoryThread()
+	fmt.Println("n7k8d8cc8m start http server in 127.0.01:3333")
 	err := http.ListenAndServe(":3333", nil)
 	if err != nil {
 		log.Fatal("ListenAndServe: ", err)
@@ -103,17 +105,21 @@ func GetData(startTime time.Time, endTime time.Time) []byte {
 	return r
 }
 
-func GetIsOnline(w http.ResponseWriter, r *http.Request){
+func GetIsOnline(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Access-Control-Allow-Origin", "*")
 	w.Header().Add("Access-Control-Allow-Headers", "Content-Type")
 	w.Header().Set("content-type", "application/json")
 	w.Write([]byte("true"))
 }
 
-/*
-func GetDataGroup(w http.ResponseWriter, r *http.Request){
+func GetDataGroup(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Access-Control-Allow-Origin", "*")
 	w.Header().Add("Access-Control-Allow-Headers", "Content-Type")
-	w.Header().Set("content-type", "application/json")
+	fmt.Println(getQValue(r,"sub"))
+	w.Write([]byte("successed"))
 }
-*/
+
+func getQValue(r *http.Request, key string) string {
+	r.Form.Encode()
+	return r.FormValue(key)
+}
