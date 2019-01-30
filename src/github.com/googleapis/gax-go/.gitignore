@@ -1,0 +1,11 @@
+*.cover
+
+.DS_Store
+.idea
+*__gen.go
+*__ignore.go
+*.swp
+*.swo
+~i_*
+ig_*
+zzzig_*
